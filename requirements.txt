@@ -1,0 +1,10 @@
+pytesseract
+Pillow
+pdf2image
+PyPDF2
+python-docx
+ocrmypdf
+streamlit
+dotenv
+openai
+openpyxl
