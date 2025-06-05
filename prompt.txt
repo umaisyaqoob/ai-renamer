@@ -191,3 +191,8 @@ Use this if:
 •	Mentions: "definitieve aanslag ZVW"
 Do not use if:
 •	It's a provisional assessment → see E7
+
+
+
+
+# Prompt version: v1.0 – Updated 2025-05-29

@@ -2,6 +2,8 @@ import os
 import openai
 from dotenv import load_dotenv
 import re
+import json
+
 
 
 load_dotenv()
@@ -12,29 +14,24 @@ def load_prompt():
         return f.read()
 
 def validate_response(response: str, company_name: str, full_name: str) -> dict:
-    """
-    Parses GPT response and returns structured values.
-    Expected format: YEAR:<year>,CODE:<code>,New Filename:<filename>,WARNINGS:<warnings>
-    """
-    match = re.match(r"YEAR:(.*?),CODE:(.*?),New Filename:(.*?),WARNINGS:(.*)", response)
-    if match:
-        year, code, filename, warnings = match.groups()
-        year_p = year.strip() or "N_A"
-        code_p = code.strip() or "N_A"
+    try:
+        parsed = json.loads(response)
         return {
-            "year": year_p,
-            "code": code_p,
-            "filename": filename.strip() if filename.strip() != "N_A" else f"{code_p} {company_name} - {full_name} {year_p}",
-            "warnings": warnings.strip() or "No warnings provided"
+            "year": parsed.get("year", "N_A").strip() or "N_A",
+            "code": parsed.get("code", "N_A").strip() or "N_A",
+            "filename": parsed.get("filename", f"N_A {company_name} - {full_name} N_A").strip() or "N_A",
+            "warnings": parsed.get("warnings", "No warnings provided").strip() or "No warnings provided",
+            "status": "Success"
         }
-    
-    # If not matched at all
-    return {
-        "year": "N_A",
-        "code": "N_A",
-        "filename": f"N_A {company_name} - {full_name} N_A",
-        "warnings": "Response format invalid or missing expected fields"
-    }
+    except Exception as e:
+        return {
+            "year": "N_A",
+            "code": "N_A",
+            "filename": f"N_A {company_name} - {full_name} N_A",
+            "warnings": "Response was not valid JSON",
+            "status": f"JSON parse error: {e}"
+        }
+
 
 
 def get_gpt_response(text: str, company_name: str, full_name: str) -> dict:
@@ -49,16 +46,25 @@ def get_gpt_response(text: str, company_name: str, full_name: str) -> dict:
     )
     
     strict_format_instruction = """
-    RESPONSE FORMAT (strictly follow this structure without any explanation):
-    YEAR:<year>,CODE:<code>,New Filename:<new_filename>,WARNINGS:<warnings>
+    You must respond ONLY with a valid JSON object — no markdown, no ```json, no explanation, no extra text.
 
-    - WARNINGS should reflect any inconsistencies, unusual patterns, missing values, conflicting data, or anything worth notifying the user.
-    - If everything is fine, simply write: WARNINGS:None
-    - Do NOT explain anything outside the strict format.
+    RESPONSE FORMAT (strictly follow this structure):
 
-    EXAMPLE:
-    YEAR:2024,CODE:E7,New Filename:E7 Test Company - W Verheul Voorlopige Aanslag ZVW 2024.pdf,WARNINGS:Document refers to 2023 values but mentions 2024 in title
+    {
+    "year": "<year>",
+    "code": "<code>",
+    "filename": "<new_filename>",
+    "warnings": "<warnings>"
+    }
+
+    Guidelines:
+    - All values must be strings.
+    - Do NOT add any extra fields or repeat keys.
+    - Do NOT wrap the JSON in triple backticks (```) or anything else.
+    - If there are no warnings, use: "warnings": "None"
+    - Output must be a clean, parsable JSON object — no additional text before or after.
     """
+
 
 
     full_prompt = header + strict_format_instruction + "\n\n" + base_prompt + "\n\n" + text
@@ -70,7 +76,6 @@ def get_gpt_response(text: str, company_name: str, full_name: str) -> dict:
             temperature=0.3,
         )
         gpt_raw = resp.choices[0].message.content.strip()
-        print(gpt_raw)
         return validate_response(gpt_raw, company_name, full_name)
     except Exception as e:
         print(f"GPT Error: {e}")

@@ -8,3 +8,4 @@ streamlit
 dotenv
 openai
 openpyxl
+pyinstaller
